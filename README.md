@@ -41,68 +41,6 @@ O projeto utiliza **MySQL** como banco de dados. Para configurar o banco, siga o
     spring.jpa.show-sql=true
     spring.jpa.properties.hibernate.format_sql=true
     ```
-
-## **Dependências no `pom.xml`**
-
-As dependências essenciais do projeto são configuradas no arquivo `pom.xml`:
-
-```xml
-<dependencies>
-    <!-- Spring Boot Starter JPA -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
-
-    <!-- Spring Boot Starter Web -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-
-    <!-- MySQL Connector -->
-    <dependency>
-        <groupId>com.mysql</groupId>
-        <artifactId>mysql-connector-j</artifactId>
-        <scope>runtime</scope>
-    </dependency>
-
-    <!-- Springdoc OpenAPI UI -->
-    <dependency>
-        <groupId>org.springdoc</groupId>
-        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-        <version>2.3.0</version>
-    </dependency>
-
-    <!-- Dependências para Mockito -->
-    <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-core</artifactId>
-        <version>5.3.1</version>
-        <scope>test</scope>
-    </dependency>
-
-    <!-- Redis para cache -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-data-redis</artifactId>
-    </dependency>
-
-    <!-- JWT para autenticação -->
-    <dependency>
-        <groupId>com.auth0</groupId>
-        <artifactId>java-jwt</artifactId>
-        <version>4.3.0</version>
-    </dependency>
-
-    <!-- Spring Security -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-</dependencies>
-
-
 **Endpoints**
 A aplicação disponibiliza alguns endpoints principais para interação com os pedidos:
 

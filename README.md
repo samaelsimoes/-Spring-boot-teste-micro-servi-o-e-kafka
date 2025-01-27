@@ -70,10 +70,10 @@ Para subir os containers, no diretorio que foi criado docker-compose.yml
 **Endpoints**
 A aplicação disponibiliza os seguintes endpoints principais para interação com os pedidos:
 
-POST /api/pedidos - Cria um novo pedido
-GET /api/pedidos/{id} - Recupera um pedido pelo ID
-PUT /api/pedidos/{id} - Atualiza um pedido existente
-DELETE /api/pedidos/{id} - Deleta um pedido pelo ID
+- POST /api/pedidos - Cria um novo pedido
+- GET /api/pedidos/{id} - Recupera um pedido pelo ID
+- PUT /api/pedidos/{id} - Atualiza um pedido existente
+- DELETE /api/pedidos/{id} - Deleta um pedido pelo ID
 
 
 URL do Kafka Broker: localhost:9092

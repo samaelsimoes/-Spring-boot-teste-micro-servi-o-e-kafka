@@ -1,0 +1,59 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - kafka-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://host.docker.internal:9092  # Ajuste para acesso externo
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka-network
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: kafdrop
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:9092
+      KAFKA_ZOOKEEPERCONNECT: zookeeper:2181
+    depends_on:
+      - kafka
+    networks:
+      - kafka-network
+
+  kafka-manager:
+    image: hlebalbau/kafka-manager:latest
+    container_name: kafka-manager
+    environment:
+      ZK_HOSTS: zookeeper:2181
+      KAFKA_VERSION: "2.8.0"
+      APPLICATION_SECRET: "kafka-manager-secret"
+    ports:
+      - "9001:9001"
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge

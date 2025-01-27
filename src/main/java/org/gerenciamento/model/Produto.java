@@ -24,10 +24,6 @@ public class Produto {
     private BigDecimal preco;
 
     @ManyToOne
-    @JoinColumn(name = "pedido_id")
-    private Pedido pedido;
-
-    @ManyToOne
     @JoinColumn(name = "ordem_id")
     private Ordem ordem;
 }

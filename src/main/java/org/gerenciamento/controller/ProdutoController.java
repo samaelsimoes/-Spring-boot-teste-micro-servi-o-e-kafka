@@ -17,15 +17,21 @@ public class ProdutoController {
     @Autowired
     private OrderService orderService;
 
-    @PostMapping("/pedido/{pedidoId}")
-    @Operation(summary = "Cadastrar um produto", description = "Cadastra um novo produto para um pedido específico")
-    public ProdutoDto cadastrarProduto(@RequestBody ProdutoDto produtoDTO, @PathVariable Long pedidoId) {
-        return orderService.cadastrarProduto(produtoDTO, pedidoId);
+    @PostMapping
+    @Operation(summary = "Cadastrar um produto", description = "Cadastra um novo produto")
+    public ProdutoDto cadastrarProduto(@RequestBody ProdutoDto produtoDTO) {
+        return orderService.cadastrarProduto(produtoDTO);
     }
 
     @GetMapping
     @Operation(summary = "Listar todos os produtos", description = "Recupera todos os produtos cadastrados na base de dados")
     public List<ProdutoDto> listarProdutos() {
         return orderService.listarProdutos();
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Buscar produto por ID", description = "Recupera um produto específico pelo seu ID")
+    public ProdutoDto buscarProdutoPorId(@PathVariable Long id) {
+        return orderService.buscarProdutoPorId(id);
     }
 }

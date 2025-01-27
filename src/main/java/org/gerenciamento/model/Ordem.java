@@ -16,16 +16,13 @@ import java.util.List;
 @Entity
 public class Ordem {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String status;
     private BigDecimal valorTotal;
-
-    @ManyToOne
-    @JoinColumn(name = "pedido_id")
-    private Pedido pedido;
 
     @OneToMany(mappedBy = "ordem")
     private List<Produto> produtos;

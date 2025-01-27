@@ -1,34 +1,35 @@
 package org.gerenciamento.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.gerenciamento.dto.OrdemDto;
-import org.gerenciamento.dto.PedidoDto;
 import org.gerenciamento.dto.ProdutoDto;
+import org.gerenciamento.exceptions.CustomException;
+import org.gerenciamento.exceptions.OrdemNaoEncontradaException;
 import org.gerenciamento.model.Ordem;
-import org.gerenciamento.model.Pedido;
 import org.gerenciamento.model.Produto;
 import org.gerenciamento.repository.OrdemRepository;
-import org.gerenciamento.repository.PedidoRepository;
 import org.gerenciamento.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
-import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Service
 @AllArgsConstructor
 @NoArgsConstructor
-@Service
 public class OrderService {
-
-    @Autowired
-    private PedidoRepository pedidoRepository;
 
     @Autowired
     private OrdemRepository ordemRepository;
@@ -36,101 +37,124 @@ public class OrderService {
     @Autowired
     private ProdutoRepository produtoRepository;
 
-    @CachePut(value = "pedidos", key = "#pedidoDTO.id")
-    public PedidoDto cadastrarPedido(PedidoDto pedidoDTO) {
-        Pedido pedidoExistente = pedidoRepository.findById(pedidoDTO.getId())
-                .orElse(null);
+    private KafkaTemplate<String, String> kafkaTemplate;
 
-        if (pedidoExistente != null) {
-            throw new RuntimeException("Pedido já existe com o ID " + pedidoDTO.getId());
-        }
-
-        Pedido pedido = new Pedido();
-        pedido.setStatus(pedidoDTO.getStatus());
-        pedido.setValorTotal(pedidoDTO.getValorTotal());
-
-        List<Produto> produtos = produtoRepository.findAllById(pedidoDTO.getProdutoIds());
-        pedido.setProdutos(produtos);
-
-        pedidoRepository.save(pedido);
-
-        return pedidoDTO;
-    }
+    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
 
     @CachePut(value = "ordens", key = "#ordemDTO.id")
     public OrdemDto cadastrarOrdem(OrdemDto ordemDTO) {
-        Pedido pedido = pedidoRepository.findById(ordemDTO.getPedidoId())
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+        logger.info("Iniciando cadastro de uma nova ordem com ID: {}" + ordemDTO.getId());
+
         Ordem ordem = new Ordem();
         ordem.setStatus(ordemDTO.getStatus());
-        ordem.setPedido(pedido);
         ordem.setValorTotal(calcularValorTotal(ordemDTO.getProdutoIds()));
+
+        List<Produto> produtos = produtoRepository.findAllById(ordemDTO.getProdutoIds());
+        if (produtos.isEmpty()) {
+            throw new CustomException("PRODUTO_NAO_ENCONTRADO", "Nenhum produto encontrado para os IDs fornecidos.");
+        }
+
+        ordem.setProdutos(produtos);
+
         ordemRepository.save(ordem);
+        logger.info("Ordem cadastrada com sucesso. ID: {}" + ordem.getId());
+
         return toOrdemDTO(ordem);
     }
 
-    @CachePut(value = "produtos", key = "#produtoDTO.id")
-    public ProdutoDto cadastrarProduto(ProdutoDto produtoDTO, Long pedidoId) {
-        Pedido pedido = pedidoRepository.findById(pedidoId)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
-        Produto produto = new Produto();
-        produto.setNome(produtoDTO.getNome());
-        produto.setPreco(produtoDTO.getPreco());
-        produto.setPedido(pedido);
-        produtoRepository.save(produto);
-        return toProdutoDTO(produto);
+    @Scheduled(fixedRate = 60000)
+    public void receberPedidosExternosA() {
+        logger.info("Recebendo pedidos do Sistema A...");
+        List<OrdemDto> pedidosRecebidos = integrarComSistemaA();
+        for (OrdemDto pedido : pedidosRecebidos) {
+            cadastrarOrdem(pedido);
+        }
     }
 
-    @Cacheable(value = "pedidos", key = "#status")
-    public List<PedidoDto> listarPedidosPorStatus(String status) {
-        return pedidoRepository.findByStatus(status).stream()
-                .map(pedido -> new PedidoDto(pedido.getId(), pedido.getStatus(), pedido.getValorTotal()))
-                .collect(Collectors.toList());
+    public List<OrdemDto> integrarComSistemaA() {
+
+        List<OrdemDto> ordensDoSistemaA = new ArrayList<>();
+
+        OrdemDto ordem = new OrdemDto();
+        ordem.setId(1L);
+        ordem.setStatus("Pendente");
+        ordem.setProdutoIds(Arrays.asList(1L, 2L));
+        ordensDoSistemaA.add(ordem);
+
+        return ordensDoSistemaA;
     }
 
-    @Cacheable(value = "produtos", key = "'todos'")
-    public List<ProdutoDto> listarProdutos() {
-        List<Produto> produtos = produtoRepository.findAll();
-        return produtos.stream().map(this::toProdutoDTO).collect(Collectors.toList());
+    public void integrarComSistemaB(List<OrdemDto> ordens) {
+        for (OrdemDto ordemDto : ordens) {
+            Ordem ordem = toOrdem(ordemDto);
+            logger.info("Enviando ordem ID: {} para o Sistema B.", ordem.getId());
+            enviarOrdemParaKafka(ordem);
+        }
     }
 
-    @Cacheable(value = "ordens", key = "'todos'")
-    public List<OrdemDto> listarOrdens() {
-        List<Ordem> ordens = ordemRepository.findAll();
-        return ordens.stream().map(this::toOrdemDTO).collect(Collectors.toList());
-    }
-
-    @Cacheable(value = "pedidos", key = "#id")
-    public PedidoDto getPedidoById(Long id) {
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
-        return toPedidoDTO(pedido);
+    private Ordem toOrdem(OrdemDto ordemDto) {
+        Ordem ordem = new Ordem();
+        ordem.setId(ordemDto.getId());
+        ordem.setStatus(ordemDto.getStatus());
+        ordem.setValorTotal(ordemDto.getValorTotal());
+        List<Produto> produtos = produtoRepository.findAllById(ordemDto.getProdutoIds());
+        ordem.setProdutos(produtos);
+        return ordem;
     }
 
     private BigDecimal calcularValorTotal(List<Long> produtoIds) {
+        logger.info("Calculando valor total para os produtos: {}", produtoIds);
         List<Produto> produtos = produtoRepository.findAllById(produtoIds);
-        return produtos.stream()
-                .map(Produto::getPreco)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private PedidoDto toPedidoDTO(Pedido pedido) {
-        PedidoDto dto = new PedidoDto();
-        dto.setId(pedido.getId());
-        dto.setStatus(pedido.getStatus());
-        dto.setProdutoIds(pedido.getProdutos().stream().map(Produto::getId).collect(Collectors.toList()));
-        dto.setValorTotal(pedido.getValorTotal());
-        return dto;
+        if (produtos.isEmpty()) {
+            throw new CustomException("PRODUTO_NAO_ENCONTRADO", "Nenhum produto encontrado para os IDs fornecidos.");
+        }
+        return produtos.stream().map(Produto::getPreco).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private OrdemDto toOrdemDTO(Ordem ordem) {
         OrdemDto dto = new OrdemDto();
         dto.setId(ordem.getId());
         dto.setStatus(ordem.getStatus());
-        dto.setPedidoId(ordem.getPedido().getId());
         dto.setProdutoIds(ordem.getProdutos().stream().map(Produto::getId).collect(Collectors.toList()));
         dto.setValorTotal(ordem.getValorTotal());
         return dto;
+    }
+
+    public ProdutoDto cadastrarProduto(ProdutoDto produtoDTO) {
+        logger.info("Cadastrando novo produto: {}" + produtoDTO.getNome());
+
+        Produto produto = new Produto();
+        produto.setNome(produtoDTO.getNome());
+        produto.setPreco(produtoDTO.getPreco());
+
+        Produto produtoSalvo = produtoRepository.save(produto);
+        logger.info("Produto cadastrado com sucesso. ID: {}" + produtoSalvo.getId());
+
+        return toProdutoDTO(produtoSalvo);
+    }
+
+    public ProdutoDto buscarProdutoPorId(Long id) {
+        logger.info("Buscando produto com ID: {}" + id);
+
+        Produto produto = produtoRepository.findById(id)
+                .orElseThrow(() -> new CustomException("PRODUTO_NAO_ENCONTRADO", "Produto não encontrado com o ID: " + id));
+
+        return toProdutoDTO(produto);
+    }
+
+    public OrdemDto buscarOrdemPorId(Long id) {
+        logger.info("Buscando ordem com ID: {}" + id);
+        Ordem ordem = ordemRepository.findById(id)
+                .orElseThrow(() -> new OrdemNaoEncontradaException("Ordem não encontrada com o ID: " + id));
+
+        return toOrdemDTO(ordem);
+    }
+
+    public List<ProdutoDto> listarProdutos() {
+        logger.info("Listando todos os produtos.");
+
+        List<Produto> produtos = produtoRepository.findAll();
+        return produtos.stream().map(this::toProdutoDTO).collect(Collectors.toList());
     }
 
     private ProdutoDto toProdutoDTO(Produto produto) {
@@ -141,22 +165,65 @@ public class OrderService {
         return dto;
     }
 
-    public List<PedidoDto> listarPedidos() {
-        return pedidoRepository.findAll().stream()
-                .map(pedido -> new PedidoDto(pedido.getId(), pedido.getStatus(), pedido.getValorTotal()))
-                .collect(Collectors.toList());
+    @Cacheable(value = "ordens", key = "'todos'")
+    public List<OrdemDto> listarOrdens() {
+        logger.info("Listando todas as ordens.");
+        List<Ordem> ordens = ordemRepository.findAll();
+        return ordens.stream().map(this::toOrdemDTO).collect(Collectors.toList());
     }
 
-    @CacheEvict(value = "pedidos", key = "#ordemDto.pedidoId")
-    public PedidoDto processarPedidoExterno(OrdemDto ordemDto) {
-        Pedido pedido = new Pedido();
-        pedido.setStatus(ordemDto.getStatus());
+    public void enviarOrdemParaKafka(Ordem ordem) {
+        try {
+            String ordemJson = convertToJson(ordem);
+            kafkaTemplate.send("ordens", ordemJson);
+            logger.info("Ordem enviada para o Kafka: " + ordem.getId());
+        } catch (Exception e) {
+            logger.error("Erro ao enviar ordem para o Kafka", e);
+        }
+    }
 
-        BigDecimal valorTotal = calcularValorTotal(ordemDto.getProdutoIds());
-        pedido.setValorTotal(valorTotal);
+    public void processarOrdem(String ordemJson) {
+        try {
+            Ordem ordem = convertToOrdem(ordemJson);
 
-        pedidoRepository.save(pedido);
+            if (!ordemRepository.existsById(ordem.getId())) {
+                BigDecimal valorTotal = calcularTotalOrdem(ordem.getProdutos());
+                ordem.setValorTotal(valorTotal);
 
-        return new PedidoDto(pedido.getId(), pedido.getStatus(), pedido.getValorTotal());
+                ordemRepository.save(ordem);
+            } else {
+                System.out.println("A ordem com ID " + ordem.getId() + " já foi processada.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private BigDecimal calcularTotalOrdem(List<Produto> produtos) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (Produto produto : produtos) {
+            total = total.add(produto.getPreco()); //
+        }
+        return total;
+    }
+
+    private String convertToJson(Ordem ordem) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.writeValueAsString(ordem);
+    }
+
+    private Ordem convertToOrdem(String ordemJson) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.readValue(ordemJson, Ordem.class);
+    }
+
+    @Transactional
+    public Ordem saveOrUpdateOrdem(Ordem ordem) {
+        return ordemRepository.save(ordem);
+    }
+
+    @Transactional
+    public Produto saveProduto(Produto produto) {
+        return produtoRepository.save(produto);
     }
 }

@@ -4,3 +4,17 @@ spring:
       port: 6379
       timeout: 2000
       host: localhost
+
+  kafka:
+    bootstrap-servers: localhost:9092  # Conexão com o Kafka
+    consumer:
+      group-id: your-consumer-group
+      auto-offset-reset: earliest  # Definindo para ler desde o início
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+  # Configuração do FreeMarker para templates .ftlh
+  freemarker:
+    template-loader-path: classpath:/templates/
+    suffix: .ftlh

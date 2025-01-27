@@ -12,6 +12,7 @@ Este projeto é uma aplicação para **gerenciamento de pedidos**, desenvolvida 
 - **Spring Security**
 - **OAuth2** (para autenticação)
 - **Redis** (para cache)
+- **Kafka** (para mensageria)
 - **JUnit e Mockito** (para testes)
 - **Swagger UI** (para documentação da API)
 
@@ -21,6 +22,7 @@ Este projeto é uma aplicação para **gerenciamento de pedidos**, desenvolvida 
 - **Maven 3.x**
 - **MySQL** instalado e configurado
 - **Redis** (caso queira utilizar cache)
+- **Docker** (para facilitar o setup de dependências como Kafka e Redis)
 
 ## **Configuração do Banco de Dados**
 
@@ -54,3 +56,25 @@ A aplicação utiliza OAuth2 para autenticação. O processo de login é feito p
 **Documentação da API**
 A documentação da API pode ser acessada através do Swagger UI. Após iniciar a aplicação, acesse a URL: http://localhost:8080/swagger-ui/index.html
 
+**Configuração do Kafka e Redis com Docker**
+Para facilitar a configuração do Kafka e Redis, você pode utilizar o Docker para levantar esses serviços rapidamente. Aqui estão os passos para configurar ambos.
+
+**1. Subindo Kafka com Docker**
+O Kafka é usado para a comunicação assíncrona entre sistemas. Para rodá-lo localmente com Docker, siga os passos abaixo:
+- Crie um arquivo docker-compose.yml na raiz do projeto
+
+**Execute o Docker Compose**
+Para subir os containers, no diretorio que foi criado docker-compose.yml
+- docker-compose up -d
+
+**Endpoints**
+A aplicação disponibiliza os seguintes endpoints principais para interação com os pedidos:
+
+POST /api/pedidos - Cria um novo pedido
+GET /api/pedidos/{id} - Recupera um pedido pelo ID
+PUT /api/pedidos/{id} - Atualiza um pedido existente
+DELETE /api/pedidos/{id} - Deleta um pedido pelo ID
+
+
+URL do Kafka Broker: localhost:9092
+URL Swagger: http://localhost:8080/swagger-ui/index.html
